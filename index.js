@@ -16,24 +16,17 @@ function generateSecureHex(length) {
   return crypto.randomBytes(length / 2).toString("hex");
 }
 
+function formatDate(humanDate) {
+  const d = new Date(humanDate);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 let usersDatabaseMock = [];
 
 let exercisesDatabaseMock = [];
-
-let exerciseLogDatabaseMock = [
-  {
-    username: "fcc_test",
-    count: 1,
-    _id: "5fb5853f734231456ccb3b05",
-    log: [
-      {
-        description: "test",
-        duration: 60,
-        date: "Mon Jan 01 1990",
-      },
-    ],
-  },
-];
 
 app.post("/api/users", (req, res) => {
   const user = {
@@ -86,7 +79,7 @@ app.get("/api/users/:_id/logs", (req, res) => {
   if (!user) {
     return res.status(404).json({ error: "User not found" });
   }
-  
+
   const userExercises = exercisesDatabaseMock.filter(
     (exercise) => exercise._id === userId
   );
@@ -97,11 +90,28 @@ app.get("/api/users/:_id/logs", (req, res) => {
     date: new Date(exercise.date).toDateString(),
   }));
 
+  const { from, to, limit } = req.query;
+
+  const fromTimestamp = from ? Date.parse(from) : null;
+  const toTimestamp = to ? Date.parse(to) : null;
+
+  let filteredLogs = log.filter((entry) => {
+    const logTimestamp = Date.parse(formatDate(entry.date));
+
+    if (fromTimestamp && logTimestamp < fromTimestamp) return false;
+
+    if (toTimestamp && logTimestamp > toTimestamp) return false;
+    return true;
+  });
+
+  if (limit) {
+    filteredLogs = filteredLogs.slice(0, parseInt(limit, 10));
+  }
+
   const userLog = {
-    _id: userId,
-    username: user.username,
-    count: log.length,
-    log,
+    ...user,
+    count: filteredLogs.length,
+    log: filteredLogs,
   };
 
   res.json(userLog);
